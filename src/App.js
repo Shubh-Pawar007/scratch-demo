@@ -3,43 +3,17 @@ import Sidebar from "./components/Sidebar";
 import MidArea from "./components/MidArea";
 import PreviewArea from "./components/PreviewArea";
 
-// Helper function to execute a sprite’s script and update its state.
-function executeScript(script, initialState) {
-  let state = { rotation: 0, ...initialState };
-  script.forEach((cmd) => {
-    if (cmd.type === "move") {
-      state.x += Number(cmd.value || 10);
-    } else if (cmd.type === "turn") {
-      state.rotation += Number(cmd.value || 15);
-    } else if (cmd.type === "goto") {
-      state.x = Number(cmd.x || 0);
-      state.y = Number(cmd.y || 0);
-    } else if (cmd.type === "repeat") {
-      const times = Number(cmd.times || 2);
-      for (let i = 0; i < times; i++) {
-        state = executeScript(cmd.commands || [], state);
-      }
-    }
-  });
-  return state;
-}
+/**
+ * A helper delay function for pausing between commands
+ */
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-// Define a helper to regenerate the block label
-function generateLabel(block) {
-  if (block.type === "move") {
-    return `Move ${block.value} steps`;
-  } else if (block.type === "turn") {
-    return `Turn ${block.value}°`;
-  } else if (block.type === "goto") {
-    return `Go to x:${block.x} y:${block.y}`;
-  } else if (block.type === "repeat") {
-    return `Repeat ${block.times} times`;
-  }
-  return block.label;
-}
-
+/**
+ * Collision checker:
+ * Loops through sprites and swaps their scripts if two sprites collide.
+ */
+const COLLISION_DISTANCE = 50; // adjust as needed
 export default function App() {
-  // Palette and sprites state (unchanged)
   const [palette, setPalette] = useState([
     { id: 1, type: "move", label: "Move 10 steps", value: 10 },
     { id: 2, type: "turn", label: "Turn 15°", value: 15 },
@@ -56,17 +30,33 @@ export default function App() {
       rotation: 0,
     },
   ]);
+
   const [currentSpriteId, setCurrentSpriteId] = useState(1);
 
-  // (drag state for blocks remains unchanged)
+  // Drag state for blocks
   const [draggedBlock, setDraggedBlock] = useState(null);
   const [potentialDrag, setPotentialDrag] = useState(null);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
 
-  const startPotentialDrag = (block) => {
-    setPotentialDrag({ block, startPos: mousePos });
-  };
+  /**
+   * Generates a new label for a block when its values change
+   */
+  function generateLabel(block) {
+    if (block.type === "move") {
+      return `Move ${block.value} steps`;
+    } else if (block.type === "turn") {
+      return `Turn ${block.value}°`;
+    } else if (block.type === "goto") {
+      return `Go to x:${block.x} y:${block.y}`;
+    } else if (block.type === "repeat") {
+      return `Repeat ${block.times} times`;
+    }
+    return block.label;
+  }
 
+  /**
+   * Called on mouse move anywhere in the app to handle block dragging
+   */
   const handleMouseMove = (e) => {
     setMousePos({ x: e.clientX, y: e.clientY });
     if (potentialDrag && !draggedBlock) {
@@ -80,60 +70,24 @@ export default function App() {
     }
   };
 
+  /**
+   * Called on mouse up anywhere in the app to end a drag
+   */
   const handleGlobalMouseUp = () => {
     setPotentialDrag(null);
     setDraggedBlock(null);
   };
 
-  const currentSprite = sprites.find((s) => s.id === currentSpriteId);
-
-  const updateCurrentSpriteScript = (newScript) => {
-    setSprites((prev) =>
-      prev.map((s) =>
-        s.id === currentSpriteId ? { ...s, script: newScript } : s
-      )
-    );
+  /**
+   * Called when user first presses down on a block to "potentially" drag
+   */
+  const startPotentialDrag = (block) => {
+    setPotentialDrag({ block, startPos: mousePos });
   };
 
-  const moveBlock = (block, target) => {
-    if (block.source === target) return;
-    if (block.source === "palette" && target === "script") {
-      updateCurrentSpriteScript([
-        ...currentSprite.script,
-        { ...block, source: "script", id: Date.now() },
-      ]);
-    } else if (block.source === "script" && target === "palette") {
-      updateCurrentSpriteScript(
-        currentSprite.script.filter((b) => b.id !== block.id)
-      );
-    }
-  };
-
-  const clearDrag = () => {
-    setPotentialDrag(null);
-    setDraggedBlock(null);
-  };
-
-  const addSprite = () => {
-    const newId = Date.now();
-    setSprites((prev) => [
-      ...prev,
-      {
-        id: newId,
-        name: `Sprite ${prev.length + 1}`,
-        script: [],
-        position: { x: 50, y: 50 },
-        rotation: 0,
-      },
-    ]);
-    setCurrentSpriteId(newId);
-  };
-
-  // Helper delay function
-  const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-  // Collision checker: loops through sprites and swaps scripts if two sprites collide.
-  // Collision checker: loops through sprites and swaps scripts if two sprites collide.
+  /**
+   * Collision checker: loops through sprites and swaps scripts if they collide
+   */
   const checkAndSwapCollisions = () => {
     setSprites((prevSprites) => {
       const updated = [...prevSprites];
@@ -144,11 +98,11 @@ export default function App() {
           const dx = s1.position.x - s2.position.x;
           const dy = s1.position.y - s2.position.y;
           const distance = Math.sqrt(dx * dx + dy * dy);
-          // If the distance is less than 50, swap the scripts.
-          if (distance < 50) {
+          if (distance < COLLISION_DISTANCE) {
             console.log(
               `Collision detected between ${s1.name} and ${s2.name}. Swapping animations.`
             );
+            // Swap scripts
             const tempScript = s1.script;
             updated[i] = { ...s1, script: s2.script };
             updated[j] = { ...s2, script: tempScript };
@@ -159,8 +113,10 @@ export default function App() {
     });
   };
 
-  // Asynchronously run a list of commands sequentially for a given sprite,
-  // starting with an initial state (if not provided, initialize from the sprite)
+  /**
+   * Asynchronously run a list of commands sequentially for a given sprite,
+   * starting with an initial state (if not provided, initialize from the sprite)
+   */
   const runSpriteCommands = async (spriteId, commands, initState = null) => {
     let state = initState;
     if (!state) {
@@ -184,10 +140,10 @@ export default function App() {
         for (let i = 0; i < times; i++) {
           state = await runSpriteCommands(spriteId, cmd.commands || [], state);
         }
-        continue; // skip the rest for repeat block
+        continue; // skip the rest for this block
       }
 
-      // Update the sprite's state in React after processing the command
+      // Update the sprite's state in React after each command
       setSprites((prev) =>
         prev.map((s) =>
           s.id === spriteId
@@ -200,19 +156,29 @@ export default function App() {
         )
       );
 
-      // Wait a bit (e.g., 500ms) before processing the next command.
+      // Wait a bit before processing the next command
       await delay(500);
 
-      // Check for collisions and swap animations if any sprites have collided.
+      // Check for collisions and swap animations if any sprites collided
       checkAndSwapCollisions();
     }
+
     return state;
   };
 
-  // Modified play function: it gets the current sprite’s initial state and runs its commands.
+  /**
+   * The "Play" function:
+   * - Runs the current sprite's commands asynchronously.
+   * - This can be extended to run all sprites if desired.
+   */
   const play = async () => {
-    const sprite = sprites.find((s) => s.id === currentSpriteId);
-    const initialState = { ...sprite.position, rotation: sprite.rotation };
+    const currentSprite = sprites.find((s) => s.id === currentSpriteId);
+    if (!currentSprite) return;
+
+    const initialState = {
+      ...currentSprite.position,
+      rotation: currentSprite.rotation,
+    };
     await runSpriteCommands(
       currentSpriteId,
       currentSprite.script,
@@ -220,6 +186,86 @@ export default function App() {
     );
   };
 
+  /**
+   * Update the script for the currently selected sprite
+   */
+  const updateCurrentSpriteScript = (newScript) => {
+    setSprites((prev) =>
+      prev.map((s) =>
+        s.id === currentSpriteId ? { ...s, script: newScript } : s
+      )
+    );
+  };
+
+  /**
+   * Move a block between containers (palette <-> script)
+   */
+  const moveBlock = (block, target) => {
+    if (block.source === target) return;
+
+    const currentSprite = sprites.find((s) => s.id === currentSpriteId);
+    if (!currentSprite) return;
+
+    // From palette to script
+    if (block.source === "palette" && target === "script") {
+      updateCurrentSpriteScript([
+        ...currentSprite.script,
+        { ...block, source: "script", id: Date.now() },
+      ]);
+    }
+    // From script back to palette
+    else if (block.source === "script" && target === "palette") {
+      updateCurrentSpriteScript(
+        currentSprite.script.filter((b) => b.id !== block.id)
+      );
+    }
+  };
+
+  /**
+   * Clears the drag states
+   */
+  const clearDrag = () => {
+    setPotentialDrag(null);
+    setDraggedBlock(null);
+  };
+
+  /**
+   * Add a new sprite
+   */
+  const addSprite = () => {
+    const newId = Date.now();
+    setSprites((prev) => [
+      ...prev,
+      {
+        id: newId,
+        name: `Sprite ${prev.length + 1}`,
+        script: [],
+        position: { x: 50, y: 50 },
+        rotation: 0,
+      },
+    ]);
+    setCurrentSpriteId(newId);
+  };
+
+  /**
+   * Remove an existing sprite by id
+   */
+  const removeSprite = (id) => {
+    setSprites((prev) => prev.filter((s) => s.id !== id));
+    // If we removed the current sprite, pick another or reset
+    if (id === currentSpriteId) {
+      const newSprites = sprites.filter((s) => s.id !== id);
+      if (newSprites.length > 0) {
+        setCurrentSpriteId(newSprites[0].id);
+      } else {
+        setCurrentSpriteId(0);
+      }
+    }
+  };
+
+  /**
+   * Update a palette block's properties (e.g. move steps, turn degrees, etc.)
+   */
   function handlePaletteChange(blockId, field, value) {
     setPalette((prev) =>
       prev.map((b) =>
@@ -234,6 +280,9 @@ export default function App() {
     );
   }
 
+  /**
+   * Update a script block's properties for the current sprite
+   */
   function updateScriptBlock(blockId, field, value) {
     setSprites((prevSprites) =>
       prevSprites.map((sprite) =>
@@ -255,7 +304,9 @@ export default function App() {
     );
   }
 
-  // Callback to update sprite position when dragged on stage
+  /**
+   * When a sprite is dragged on the Stage, update its position
+   */
   const updateSpritePosition = (spriteId, newPosition) => {
     setSprites((prev) =>
       prev.map((sprite) =>
@@ -264,44 +315,17 @@ export default function App() {
     );
   };
 
+  // Identify the current sprite object (if any)
+  const currentSprite = sprites.find((s) => s.id === currentSpriteId);
+
   return (
     <div
-      className="bg-blue-100 pt-6 font-sans min-h-screen"
+      className="h-screen flex flex-col bg-blue-100 font-sans"
       onMouseMove={handleMouseMove}
       onMouseUp={handleGlobalMouseUp}
     >
-      {draggedBlock && (
-        <div
-          className="pointer-events-none fixed z-50 px-2 py-1 rounded text-white text-sm bg-blue-600"
-          style={{ left: mousePos.x + 10, top: mousePos.y + 10 }}
-        >
-          {draggedBlock.label}
-        </div>
-      )}
-
-      {/* Top bar with Sprite selector, Play, and Add Sprite buttons */}
-      <div className="flex items-center justify-between px-4 pb-2 border-b border-gray-300">
-        <div>
-          {sprites.map((sprite) => (
-            <button
-              key={sprite.id}
-              onClick={() => setCurrentSpriteId(sprite.id)}
-              className={`px-3 py-1 mr-2 rounded ${
-                sprite.id === currentSpriteId
-                  ? "bg-green-500 text-white"
-                  : "bg-gray-200"
-              }`}
-            >
-              {sprite.name}
-            </button>
-          ))}
-          <button
-            onClick={addSprite}
-            className="px-3 py-1 rounded bg-blue-500 text-white"
-          >
-            Add Sprite
-          </button>
-        </div>
+      {/* Top bar with only the "Play" button */}
+      <div className="flex items-center justify-end px-4 py-2 border-b border-gray-300">
         <button
           onClick={play}
           className="px-4 py-2 rounded bg-red-500 text-white"
@@ -310,8 +334,9 @@ export default function App() {
         </button>
       </div>
 
-      <div className="h-[calc(100vh-80px)] flex flex-row">
-        {/* Left: Palette */}
+      {/* Main area: 3 columns filling remaining space */}
+      <div className="flex-1 flex flex-row h-full">
+        {/* 1) Left column: Palette */}
         <Sidebar
           containerName="palette"
           blocks={palette}
@@ -322,22 +347,39 @@ export default function App() {
           clearDrag={clearDrag}
           handleChange={handlePaletteChange}
         />
-        {/* Center: Script Editor */}
+
+        {/* 2) Center column: Script Editor */}
         <MidArea
           containerName="script"
-          blocks={currentSprite.script}
+          blocks={currentSprite?.script || []}
           onStartDrag={startPotentialDrag}
           moveBlock={moveBlock}
           draggedBlock={draggedBlock}
           clearDrag={clearDrag}
           updateScriptBlock={updateScriptBlock}
+          sprites={sprites}
+          currentSpriteId={currentSpriteId}
+          setCurrentSpriteId={setCurrentSpriteId}
+          addSprite={addSprite}
+          removeSprite={removeSprite}
         />
-        {/* Right: Stage */}
+
+        {/* 3) Right column: Stage */}
         <PreviewArea
           sprites={sprites}
           updateSpritePosition={updateSpritePosition}
         />
       </div>
+
+      {/* Drag preview */}
+      {draggedBlock && (
+        <div
+          className="pointer-events-none fixed z-50 px-2 py-1 rounded text-white text-sm bg-blue-600"
+          style={{ left: mousePos.x + 10, top: mousePos.y + 10 }}
+        >
+          {draggedBlock.label}
+        </div>
+      )}
     </div>
   );
 }

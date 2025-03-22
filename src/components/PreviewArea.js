@@ -9,8 +9,6 @@ export default function PreviewArea({ sprites, updateSpritePosition }) {
     e.stopPropagation();
     // Get the bounding rectangle of the sprite element
     const spriteRect = e.currentTarget.getBoundingClientRect();
-    // Get the bounding rectangle of the container (stage)
-    const containerRect = e.currentTarget.parentElement.getBoundingClientRect();
     const offsetX = e.clientX - spriteRect.left;
     const offsetY = e.clientY - spriteRect.top;
     setDraggingSpriteId(sprite.id);

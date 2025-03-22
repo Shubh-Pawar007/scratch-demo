@@ -5,14 +5,12 @@ import ActionBlock from "./ActionBlock";
 export default function Sidebar({
   containerName,
   blocks,
-  setPalette, // palette state setter (if needed)
   onStartDrag,
   moveBlock,
   draggedBlock,
   clearDrag,
   handleChange, // function from parent to update palette blocks
 }) {
-  // Optional: a helper to generate labels if needed (can also be done in parent)
   const generateLabel = (block) => {
     if (block.type === "move") return `Move ${block.value} steps`;
     if (block.type === "turn") return `Turn ${block.value}°`;
