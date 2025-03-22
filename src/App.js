@@ -5,7 +5,7 @@ import PreviewArea from "./components/PreviewArea";
 
 // Helper function to execute a sprite’s script and update its state.
 function executeScript(script, initialState) {
-  let state = { ...initialState };
+  let state = { rotation: 0, ...initialState };
   script.forEach((cmd) => {
     if (cmd.type === "move") {
       state.x += Number(cmd.value || 10);
@@ -129,30 +129,95 @@ export default function App() {
     setCurrentSpriteId(newId);
   };
 
-  const play = () => {
-    const updatedSprites = sprites.map((sprite) => {
-      const newState = executeScript(sprite.script, sprite.position);
-      return {
-        ...sprite,
-        position: { x: newState.x, y: newState.y },
-        rotation: newState.rotation,
-      };
-    });
-    for (let i = 0; i < updatedSprites.length; i++) {
-      for (let j = i + 1; j < updatedSprites.length; j++) {
-        const s1 = updatedSprites[i];
-        const s2 = updatedSprites[j];
-        const dx = s1.position.x - s2.position.x;
-        const dy = s1.position.y - s2.position.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        if (distance < 50) {
-          const temp = s1.script;
-          updatedSprites[i] = { ...s1, script: s2.script };
-          updatedSprites[j] = { ...s2, script: temp };
+  // Helper delay function
+  const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  // Collision checker: loops through sprites and swaps scripts if two sprites collide.
+  // Collision checker: loops through sprites and swaps scripts if two sprites collide.
+  const checkAndSwapCollisions = () => {
+    setSprites((prevSprites) => {
+      const updated = [...prevSprites];
+      for (let i = 0; i < updated.length; i++) {
+        for (let j = i + 1; j < updated.length; j++) {
+          const s1 = updated[i];
+          const s2 = updated[j];
+          const dx = s1.position.x - s2.position.x;
+          const dy = s1.position.y - s2.position.y;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          // If the distance is less than 50, swap the scripts.
+          if (distance < 50) {
+            console.log(
+              `Collision detected between ${s1.name} and ${s2.name}. Swapping animations.`
+            );
+            const tempScript = s1.script;
+            updated[i] = { ...s1, script: s2.script };
+            updated[j] = { ...s2, script: tempScript };
+          }
         }
       }
+      return updated;
+    });
+  };
+
+  // Asynchronously run a list of commands sequentially for a given sprite,
+  // starting with an initial state (if not provided, initialize from the sprite)
+  const runSpriteCommands = async (spriteId, commands, initState = null) => {
+    let state = initState;
+    if (!state) {
+      const sprite = sprites.find((s) => s.id === spriteId);
+      state = { ...sprite.position, rotation: sprite.rotation };
     }
-    setSprites(updatedSprites);
+
+    for (const cmd of commands) {
+      if (cmd.type === "move") {
+        const steps = Number(cmd.value || 10);
+        const radians = state.rotation * (Math.PI / 180);
+        state.x += Math.cos(radians) * steps;
+        state.y += Math.sin(radians) * steps;
+      } else if (cmd.type === "turn") {
+        state.rotation += Number(cmd.value || 15);
+      } else if (cmd.type === "goto") {
+        state.x = Number(cmd.x || 0);
+        state.y = Number(cmd.y || 0);
+      } else if (cmd.type === "repeat") {
+        const times = Number(cmd.times || 2);
+        for (let i = 0; i < times; i++) {
+          state = await runSpriteCommands(spriteId, cmd.commands || [], state);
+        }
+        continue; // skip the rest for repeat block
+      }
+
+      // Update the sprite's state in React after processing the command
+      setSprites((prev) =>
+        prev.map((s) =>
+          s.id === spriteId
+            ? {
+                ...s,
+                position: { x: state.x, y: state.y },
+                rotation: state.rotation,
+              }
+            : s
+        )
+      );
+
+      // Wait a bit (e.g., 500ms) before processing the next command.
+      await delay(500);
+
+      // Check for collisions and swap animations if any sprites have collided.
+      checkAndSwapCollisions();
+    }
+    return state;
+  };
+
+  // Modified play function: it gets the current sprite’s initial state and runs its commands.
+  const play = async () => {
+    const sprite = sprites.find((s) => s.id === currentSpriteId);
+    const initialState = { ...sprite.position, rotation: sprite.rotation };
+    await runSpriteCommands(
+      currentSpriteId,
+      currentSprite.script,
+      initialState
+    );
   };
 
   function handlePaletteChange(blockId, field, value) {
