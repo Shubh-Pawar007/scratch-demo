@@ -1,4 +1,7 @@
+// File: src/components/MidArea.js
+
 import React from "react";
+import ActionBlock from "./ActionBlock";
 
 export default function MidArea({
   containerName,
@@ -7,11 +10,9 @@ export default function MidArea({
   moveBlock,
   draggedBlock,
   clearDrag,
+  // This is the parent's callback for updating script block values
+  updateScriptBlock,
 }) {
-  const handleMouseDown = (block) => {
-    onStartDrag({ ...block, source: containerName });
-  };
-
   const handleMouseUp = (e) => {
     e.stopPropagation();
     if (draggedBlock && draggedBlock.source !== containerName) {
@@ -20,21 +21,30 @@ export default function MidArea({
     clearDrag();
   };
 
+  // Called by ActionBlock on input changes
+  const onChangeValue = (blockId, field, value) => {
+    updateScriptBlock(blockId, field, value);
+  };
+
+  // Called by ActionBlock on mouse down
+  const onMouseDownBlock = (block) => {
+    onStartDrag({ ...block, source: containerName });
+  };
+
   return (
     <div
       onMouseUp={handleMouseUp}
-      className="flex-1 h-full overflow-auto p-4 border-l border-gray-200"
+      className="flex-1 h-[calc(100vh-80px)] overflow-auto p-4 border-l border-gray-200 bg-white"
     >
-      <div className="font-bold mb-2">Mid Area</div>
-      <div className="w-fit inline-block border-gray-200">
+      <div className="font-bold mb-2">Script Editor</div>
+      <div className="inline-block border border-gray-200 p-2">
         {blocks.map((block) => (
-          <div
+          <ActionBlock
             key={block.id}
-            onMouseDown={() => handleMouseDown(block)}
-            className="bg-blue-500 text-white px-2 py-1 my-1 rounded cursor-pointer select-none"
-          >
-            {block.label}
-          </div>
+            block={block}
+            onChangeValue={onChangeValue}
+            onMouseDownBlock={onMouseDownBlock}
+          />
         ))}
       </div>
     </div>

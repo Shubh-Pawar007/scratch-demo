@@ -1,30 +1,61 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import CatSprite from "./CatSprite";
 
-export default function PreviewArea({ commands }) {
-  const [position, setPosition] = useState({ x: 0, rotation: 0 });
+export default function PreviewArea({ sprites, updateSpritePosition }) {
+  const [draggingSpriteId, setDraggingSpriteId] = useState(null);
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
 
-  useEffect(() => {
-    let x = 0;
-    let rotation = 0;
-    commands.forEach((cmd) => {
-      if (cmd.type === "move") x += 20;
-      if (cmd.type === "turnLeft") rotation -= 15;
-      if (cmd.type === "turnRight") rotation += 15;
-    });
-    setPosition({ x, rotation });
-  }, [commands]);
+  const handleSpriteMouseDown = (e, sprite) => {
+    e.stopPropagation();
+    // Get the bounding rectangle of the sprite element
+    const spriteRect = e.currentTarget.getBoundingClientRect();
+    // Get the bounding rectangle of the container (stage)
+    const containerRect = e.currentTarget.parentElement.getBoundingClientRect();
+    const offsetX = e.clientX - spriteRect.left;
+    const offsetY = e.clientY - spriteRect.top;
+    setDraggingSpriteId(sprite.id);
+    setOffset({ x: offsetX, y: offsetY });
+  };
+
+  const handleMouseMove = (e) => {
+    if (draggingSpriteId !== null) {
+      // Get container's bounding rect
+      const containerRect = e.currentTarget.getBoundingClientRect();
+      const newX = e.clientX - containerRect.left - offset.x;
+      const newY = e.clientY - containerRect.top - offset.y;
+      updateSpritePosition(draggingSpriteId, { x: newX, y: newY });
+    }
+  };
+
+  const handleMouseUp = (e) => {
+    if (draggingSpriteId !== null) {
+      setDraggingSpriteId(null);
+    }
+  };
 
   return (
-    <div className="flex-none h-full overflow-y-auto p-4">
-      <div
-        style={{
-          transform: `translateX(${position.x}px) rotate(${position.rotation}deg)`,
-          transition: "transform 0.5s ease",
-        }}
-      >
-        <CatSprite />
-      </div>
+    <div
+      className="w-1/3 bg-white border-l border-gray-200 p-4 relative"
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
+    >
+      <div className="font-bold mb-2">Stage</div>
+      {sprites.map((sprite) => (
+        <div
+          key={sprite.id}
+          className="absolute"
+          style={{
+            left: sprite.position.x,
+            top: sprite.position.y,
+            transform: `rotate(${sprite.rotation}deg)`,
+            transition: "all 0.5s ease",
+          }}
+          onMouseDown={(e) => handleSpriteMouseDown(e, sprite)}
+        >
+          <CatSprite />
+          <div className="text-xs text-center">{sprite.name}</div>
+        </div>
+      ))}
     </div>
   );
 }
