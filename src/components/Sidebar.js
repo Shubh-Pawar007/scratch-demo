@@ -1,5 +1,6 @@
 import React from "react";
 import Icon from "./Icon";
+import ActionBlock from "./ActionBlock";
 
 export default function Sidebar({
   containerName,
@@ -8,12 +9,22 @@ export default function Sidebar({
   moveBlock,
   draggedBlock,
   clearDrag,
+  handleChange, // function from parent to update palette blocks
 }) {
-  const handleMouseDown = (block) => {
-    // Start potential drag (the block is not immediately removed)
+  const generateLabel = (block) => {
+    if (block.type === "move") return `Move ${block.value} steps`;
+    if (block.type === "turn") return `Turn ${block.value}°`;
+    if (block.type === "goto") return `Go to x:${block.x} y:${block.y}`;
+    if (block.type === "repeat") return `Repeat ${block.times} times`;
+    return block.label;
+  };
+
+  // Called by ActionBlock when the user presses down on the block.
+  const handleMouseDownBlock = (block) => {
     onStartDrag({ ...block, source: containerName });
   };
 
+  // On mouse up, if a block dragged from another container is dropped here, move it.
   const handleMouseUp = (e) => {
     e.stopPropagation();
     if (draggedBlock && draggedBlock.source !== containerName) {
@@ -24,28 +35,19 @@ export default function Sidebar({
 
   return (
     <div
-      className="w-60 flex-none h-full overflow-y-auto flex flex-col items-start p-2 border-r border-gray-200"
+      className="w-60 flex-none h-[calc(100vh-80px)] overflow-y-auto flex flex-col p-2 border-r border-gray-200 bg-white"
       onMouseUp={handleMouseUp}
     >
-      <div className="font-bold mb-2">Sidebar</div>
-      {/* Fixed blocks example (if any) */}
-      <div className="flex flex-row flex-wrap bg-yellow-500 text-white px-2 py-1 my-2 text-sm cursor-pointer">
-        {"When "}
-        <Icon name="flag" size={15} className="text-green-600 mx-2" />
-        {"clicked"}
-      </div>
-      <div className="flex flex-row flex-wrap bg-yellow-500 text-white px-2 py-1 my-2 text-sm cursor-pointer">
-        {"When this sprite clicked"}
-      </div>
-      <div className="font-bold mt-4 mb-2">Motion</div>
+      <div className="font-bold mb-2">Motion Blocks</div>
       {blocks.map((block) => (
-        <div
+        <ActionBlock
           key={block.id}
-          onMouseDown={() => handleMouseDown(block)}
-          className="bg-blue-500 text-white px-2 py-1 my-1 rounded cursor-pointer select-none"
-        >
-          {block.label}
-        </div>
+          block={block}
+          onChangeValue={(blockId, field, value) =>
+            handleChange(blockId, field, value)
+          }
+          onMouseDownBlock={handleMouseDownBlock}
+        />
       ))}
     </div>
   );
