@@ -9,22 +9,44 @@ export default function Sidebar({
   moveBlock,
   draggedBlock,
   clearDrag,
-  handleChange, // function from parent to update palette blocks
+  handleChange,
+  currentPalette,
+  setCurrentPalette,
 }) {
-  const generateLabel = (block) => {
-    if (block.type === "move") return `Move ${block.value} steps`;
-    if (block.type === "turn") return `Turn ${block.value}°`;
-    if (block.type === "goto") return `Go to x:${block.x} y:${block.y}`;
-    if (block.type === "repeat") return `Repeat ${block.times} times`;
-    return block.label;
+  const categories = [
+    { key: "motion", label: "Motion" },
+    { key: "looks", label: "Looks" },
+    { key: "events", label: "Events" },
+    { key: "controls", label: "Controls" },
+  ];
+
+  // Mapping for block bgColors (used when rendering ActionBlock)
+  const paletteBgColors = {
+    motion: "bg-blue-500",
+    looks: "bg-purple-500",
+    events: "bg-yellow-500",
+    controls: "bg-red-300",
   };
 
-  // Called by ActionBlock when the user presses down on the block.
+  // Mappings for category button backgrounds in selected/unselected states
+  const selectedBg = {
+    motion: "bg-blue-500",
+    looks: "bg-purple-500",
+    events: "bg-yellow-500",
+    controls: "bg-red-300",
+  };
+
+  const unselectedBg = {
+    motion: "bg-blue-300",
+    looks: "bg-purple-300",
+    events: "bg-yellow-300",
+    controls: "bg-red-100",
+  };
+
   const handleMouseDownBlock = (block) => {
     onStartDrag({ ...block, source: containerName });
   };
 
-  // On mouse up, if a block dragged from another container is dropped here, move it.
   const handleMouseUp = (e) => {
     e.stopPropagation();
     if (draggedBlock && draggedBlock.source !== containerName) {
@@ -35,20 +57,44 @@ export default function Sidebar({
 
   return (
     <div
-      className="w-60 flex-none h-[calc(100vh-80px)] overflow-y-auto flex flex-col p-2 border-r border-gray-200 bg-white"
+      className="w-80 max-w-[300px] h-[calc(100vh-80px)] flex flex-col p-2 border-r border-gray-200 bg-white"
       onMouseUp={handleMouseUp}
     >
-      <div className="font-bold mb-2">Motion Blocks</div>
-      {blocks.map((block) => (
-        <ActionBlock
-          key={block.id}
-          block={block}
-          onChangeValue={(blockId, field, value) =>
-            handleChange(blockId, field, value)
-          }
-          onMouseDownBlock={handleMouseDownBlock}
-        />
-      ))}
+      {/* Category selection buttons */}
+      <div className="flex space-x-2 mb-4">
+        {categories.map((cat) => (
+          <button
+            key={cat.key}
+            onClick={() => setCurrentPalette(cat.key)}
+            className={`px-2 py-1 rounded text-white ${
+              currentPalette === cat.key
+                ? selectedBg[cat.key]
+                : unselectedBg[cat.key]
+            }`}
+          >
+            {cat.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Block list area */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="font-bold mb-2">
+          {currentPalette.charAt(0).toUpperCase() + currentPalette.slice(1)}{" "}
+          Blocks
+        </div>
+        {blocks.map((block) => (
+          <ActionBlock
+            key={block.id}
+            block={block}
+            onChangeValue={(blockId, field, value) =>
+              handleChange(blockId, field, value)
+            }
+            onMouseDownBlock={handleMouseDownBlock}
+            bgColor={paletteBgColors[currentPalette]}
+          />
+        ))}
+      </div>
     </div>
   );
 }
