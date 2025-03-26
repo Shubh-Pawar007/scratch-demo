@@ -55,7 +55,7 @@ export default function PreviewArea({
             }}
             onMouseDown={(e) => handleSpriteMouseDown(e, sprite)}
           >
-            <div className="relative border">
+            <div className="relative">
               <CatSprite />
               {isPlaying && sprite.lookText && (
                 <div

@@ -8,11 +8,6 @@ import PreviewArea from "./components/PreviewArea";
  */
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-/**
- * Collision checker constant
- */
-const COLLISION_DISTANCE = 50;
-
 export default function App() {
   // Palette now stores separate arrays for each category
   const [isPlaying, setIsPlaying] = useState(false);
@@ -47,6 +42,13 @@ export default function App() {
   // Current active palette category – default is motion.
   const [currentPalette, setCurrentPalette] = useState("motion");
 
+  const paletteBgColors = {
+    motion: "bg-blue-500",
+    looks: "bg-purple-500",
+    events: "bg-yellow-500",
+    controls: "bg-red-300",
+  };
+
   const [sprites, setSprites] = useState([
     {
       id: 1,
@@ -66,7 +68,7 @@ export default function App() {
 
   /**
    * Generates a new label for a block when its values change,
-   * now handling new types such as say, think, wait, etc.
+   * handling new types such as say, think, wait, etc.
    */
   function generateLabel(block) {
     if (block.type === "move") {
@@ -128,44 +130,39 @@ export default function App() {
     setPotentialDrag({ block, startPos: mousePos });
   };
 
+  // For bounding circle collision, define sprite dimensions
   const SPRITE_RADIUS = 50;
   const SPRITE_WIDTH = 95;
   const SPRITE_HEIGHT = 100;
+
   const checkAndSwapCollisions = () => {
     setSprites((prevSprites) => {
       const updated = [...prevSprites];
-
       for (let i = 0; i < updated.length; i++) {
         for (let j = i + 1; j < updated.length; j++) {
           const s1 = updated[i];
           const s2 = updated[j];
-
           // Compute center of sprite 1
           const s1CenterX = s1.position.x + SPRITE_WIDTH / 2;
           const s1CenterY = s1.position.y + SPRITE_HEIGHT / 2;
-
           // Compute center of sprite 2
           const s2CenterX = s2.position.x + SPRITE_WIDTH / 2;
           const s2CenterY = s2.position.y + SPRITE_HEIGHT / 2;
-
           // Distance between centers
           const dx = s1CenterX - s2CenterX;
           const dy = s1CenterY - s2CenterY;
           const distance = Math.sqrt(dx * dx + dy * dy);
-
           // If distance <= sum of radii, collision occurs
           if (distance <= SPRITE_RADIUS * 2) {
             console.log(
               `Collision detected between ${s1.name} and ${s2.name}. Swapping scripts.`
             );
-            // Example collision logic: swap scripts
             const tempScript = s1.script;
             updated[i] = { ...s1, script: s2.script };
             updated[j] = { ...s2, script: tempScript };
           }
         }
       }
-
       return updated;
     });
   };
@@ -276,12 +273,21 @@ export default function App() {
     if (block.source === target) return;
     const currentSprite = sprites.find((s) => s.id === currentSpriteId);
     if (!currentSprite) return;
+
+    // From palette to script: attach bgColor from currentPalette mapping
     if (block.source === "palette" && target === "script") {
       updateCurrentSpriteScript([
         ...currentSprite.script,
-        { ...block, source: "script", id: Date.now() },
+        {
+          ...block,
+          source: "script",
+          id: Date.now(),
+          bgColor: paletteBgColors[currentPalette], // Add the bgColor here
+        },
       ]);
-    } else if (block.source === "script" && target === "palette") {
+    }
+    // From script back to palette
+    else if (block.source === "script" && target === "palette") {
       updateCurrentSpriteScript(
         currentSprite.script.filter((b) => b.id !== block.id)
       );
@@ -309,7 +315,7 @@ export default function App() {
         script: [],
         position: { x: 50, y: 50 },
         rotation: 0,
-        isVisible: true, // New sprites are visible by default
+        isVisible: true,
       },
     ]);
     setCurrentSpriteId(newId);

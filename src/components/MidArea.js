@@ -102,6 +102,7 @@ export default function MidArea({
               block={block}
               onChangeValue={onChangeValue}
               onMouseDownBlock={onMouseDownBlock}
+              bgColor={block.bgColor ? block.bgColor : "bg-blue-500"}
             />
           ))}
         </div>

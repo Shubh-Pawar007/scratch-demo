@@ -4,6 +4,7 @@ export default function ActionBlock({
   block,
   onChangeValue,
   onMouseDownBlock,
+  bgColor = "bg-blue-500", // default fallback
 }) {
   // Helper to update any field value
   const handleInputChange = (field, newValue) => {
@@ -13,7 +14,7 @@ export default function ActionBlock({
   return (
     <div
       onMouseDown={() => onMouseDownBlock(block)}
-      className="bg-blue-500 text-white px-2 py-1 my-1 rounded cursor-pointer select-none"
+      className={`${bgColor} text-black border px-2 py-1 my-1 rounded cursor-pointer select-none flex-none`}
     >
       {block.type === "move" && (
         <div className="flex items-center">
