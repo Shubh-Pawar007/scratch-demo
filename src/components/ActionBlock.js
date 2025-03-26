@@ -1,19 +1,11 @@
-// File: src/components/ActionBlock.js
-
 import React from "react";
 
-/**
- * A reusable action block that:
- *  - Shows label + input fields based on block.type
- *  - Calls onChangeValue when inputs change
- *  - Calls onMouseDownBlock when the user presses down (for drag)
- */
 export default function ActionBlock({
   block,
   onChangeValue,
   onMouseDownBlock,
 }) {
-  // Helper to handle changes to any numeric field (e.g. "value", "x", "y", "times")
+  // Helper to update any field value
   const handleInputChange = (field, newValue) => {
     onChangeValue(block.id, field, newValue);
   };
@@ -36,7 +28,6 @@ export default function ActionBlock({
           <span> steps</span>
         </div>
       )}
-
       {block.type === "turn" && (
         <div className="flex items-center">
           <span>Turn </span>
@@ -50,7 +41,6 @@ export default function ActionBlock({
           <span>°</span>
         </div>
       )}
-
       {block.type === "goto" && (
         <div className="flex items-center">
           <span>Go to x:</span>
@@ -71,7 +61,6 @@ export default function ActionBlock({
           />
         </div>
       )}
-
       {block.type === "repeat" && (
         <div className="flex items-center">
           <span>Repeat </span>
@@ -85,12 +74,62 @@ export default function ActionBlock({
           <span> times</span>
         </div>
       )}
-
-      {/* Fallback: if block.type doesn't match, just show its label */}
-      {block.type !== "move" &&
-        block.type !== "turn" &&
-        block.type !== "goto" &&
-        block.type !== "repeat" && <span>{block.label}</span>}
+      {block.type === "say" && (
+        <div className="flex items-center">
+          <span>Say </span>
+          <input
+            type="text"
+            value={block.text}
+            onChange={(e) => handleInputChange("text", e.target.value)}
+            onMouseDown={(e) => e.stopPropagation()}
+            className="mx-1 p-1 text-black"
+          />
+        </div>
+      )}
+      {block.type === "think" && (
+        <div className="flex items-center">
+          <span>Think </span>
+          <input
+            type="text"
+            value={block.text}
+            onChange={(e) => handleInputChange("text", e.target.value)}
+            onMouseDown={(e) => e.stopPropagation()}
+            className="mx-1 p-1 text-black"
+          />
+        </div>
+      )}
+      {block.type === "wait" && (
+        <div className="flex items-center">
+          <span>Wait </span>
+          <input
+            type="number"
+            value={block.time}
+            onChange={(e) => handleInputChange("time", e.target.value)}
+            onMouseDown={(e) => e.stopPropagation()}
+            className="mx-1 w-12 p-1 text-black"
+          />
+          <span> sec</span>
+        </div>
+      )}
+      {(block.type === "whenClicked" ||
+        block.type === "whenFlagClicked" ||
+        block.type === "forever") && (
+        <div className="flex items-center">
+          <span>{block.label}</span>
+        </div>
+      )}
+      {![
+        "move",
+        "turn",
+        "goto",
+        "repeat",
+        "say",
+        "think",
+        "wait",
+        "whenClicked",
+        "whenFlagClicked",
+        "forever",
+      ].includes(block.type) && <span>{block.label}</span>}
     </div>
   );
 }

@@ -4,22 +4,48 @@ import MidArea from "./components/MidArea";
 import PreviewArea from "./components/PreviewArea";
 
 /**
- * A helper delay function for pausing between commands
+ * Helper delay function for pausing between commands
  */
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
- * Collision checker:
- * Loops through sprites and swaps their scripts if two sprites collide.
+ * Collision checker constant
  */
-const COLLISION_DISTANCE = 50; // adjust as needed
+const COLLISION_DISTANCE = 50;
+
 export default function App() {
-  const [palette, setPalette] = useState([
-    { id: 1, type: "move", label: "Move 10 steps", value: 10 },
-    { id: 2, type: "turn", label: "Turn 15°", value: 15 },
-    { id: 3, type: "goto", label: "Go to x:0 y:0", x: 0, y: 0 },
-    { id: 4, type: "repeat", label: "Repeat 2 times", times: 2, commands: [] },
-  ]);
+  // Palette now stores separate arrays for each category
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [palettes, setPalettes] = useState({
+    motion: [
+      { id: 1, type: "move", label: "Move 10 steps", value: 10 },
+      { id: 2, type: "turn", label: "Turn 15°", value: 15 },
+      { id: 3, type: "goto", label: "Go to x:0 y:0", x: 0, y: 0 },
+      {
+        id: 4,
+        type: "repeat",
+        label: "Repeat 2 times",
+        times: 2,
+        commands: [],
+      },
+    ],
+    looks: [
+      { id: 101, type: "say", label: 'Say "Hello!"', text: "Hello!" },
+      { id: 102, type: "think", label: 'Think "Hmm..."', text: "Hmm..." },
+      { id: 103, type: "show", label: "Show" },
+      { id: 104, type: "hide", label: "Hide" },
+    ],
+    events: [
+      { id: 201, type: "whenClicked", label: "When clicked" },
+      { id: 202, type: "whenFlagClicked", label: "When flag clicked" },
+    ],
+    controls: [
+      { id: 301, type: "wait", label: "Wait 1 sec", time: 1 },
+      { id: 302, type: "forever", label: "Forever", commands: [] },
+    ],
+  });
+  // Current active palette category – default is motion.
+  const [currentPalette, setCurrentPalette] = useState("motion");
 
   const [sprites, setSprites] = useState([
     {
@@ -28,9 +54,9 @@ export default function App() {
       script: [],
       position: { x: 50, y: 50 },
       rotation: 0,
+      isVisible: true,
     },
   ]);
-
   const [currentSpriteId, setCurrentSpriteId] = useState(1);
 
   // Drag state for blocks
@@ -39,7 +65,8 @@ export default function App() {
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
 
   /**
-   * Generates a new label for a block when its values change
+   * Generates a new label for a block when its values change,
+   * now handling new types such as say, think, wait, etc.
    */
   function generateLabel(block) {
     if (block.type === "move") {
@@ -50,12 +77,28 @@ export default function App() {
       return `Go to x:${block.x} y:${block.y}`;
     } else if (block.type === "repeat") {
       return `Repeat ${block.times} times`;
+    } else if (block.type === "say") {
+      return `Say "${block.text}"`;
+    } else if (block.type === "think") {
+      return `Think "${block.text}"`;
+    } else if (block.type === "whenClicked") {
+      return "When clicked";
+    } else if (block.type === "whenFlagClicked") {
+      return "When flag clicked";
+    } else if (block.type === "wait") {
+      return `Wait ${block.time} sec`;
+    } else if (block.type === "forever") {
+      return "Forever";
+    } else if (block.type === "hide") {
+      return "Hide";
+    } else if (block.type === "show") {
+      return "Show";
     }
     return block.label;
   }
 
   /**
-   * Called on mouse move anywhere in the app to handle block dragging
+   * Mouse move handler to support dragging
    */
   const handleMouseMove = (e) => {
     setMousePos({ x: e.clientX, y: e.clientY });
@@ -71,7 +114,7 @@ export default function App() {
   };
 
   /**
-   * Called on mouse up anywhere in the app to end a drag
+   * Global mouse up to cancel drag states
    */
   const handleGlobalMouseUp = () => {
     setPotentialDrag(null);
@@ -79,51 +122,60 @@ export default function App() {
   };
 
   /**
-   * Called when user first presses down on a block to "potentially" drag
+   * Start a potential drag on a block
    */
   const startPotentialDrag = (block) => {
     setPotentialDrag({ block, startPos: mousePos });
   };
 
-  /**
-   * Collision checker: loops through sprites and swaps scripts if they collide
-   */
+  const SPRITE_RADIUS = 50;
+  const SPRITE_WIDTH = 95;
+  const SPRITE_HEIGHT = 100;
   const checkAndSwapCollisions = () => {
     setSprites((prevSprites) => {
       const updated = [...prevSprites];
+
       for (let i = 0; i < updated.length; i++) {
         for (let j = i + 1; j < updated.length; j++) {
           const s1 = updated[i];
           const s2 = updated[j];
-          const dx = s1.position.x - s2.position.x;
-          const dy = s1.position.y - s2.position.y;
+
+          // Compute center of sprite 1
+          const s1CenterX = s1.position.x + SPRITE_WIDTH / 2;
+          const s1CenterY = s1.position.y + SPRITE_HEIGHT / 2;
+
+          // Compute center of sprite 2
+          const s2CenterX = s2.position.x + SPRITE_WIDTH / 2;
+          const s2CenterY = s2.position.y + SPRITE_HEIGHT / 2;
+
+          // Distance between centers
+          const dx = s1CenterX - s2CenterX;
+          const dy = s1CenterY - s2CenterY;
           const distance = Math.sqrt(dx * dx + dy * dy);
-          if (distance < COLLISION_DISTANCE) {
+
+          // If distance <= sum of radii, collision occurs
+          if (distance <= SPRITE_RADIUS * 2) {
             console.log(
-              `Collision detected between ${s1.name} and ${s2.name}. Swapping animations.`
+              `Collision detected between ${s1.name} and ${s2.name}. Swapping scripts.`
             );
-            // Swap scripts
+            // Example collision logic: swap scripts
             const tempScript = s1.script;
             updated[i] = { ...s1, script: s2.script };
             updated[j] = { ...s2, script: tempScript };
           }
         }
       }
+
       return updated;
     });
   };
 
-  /**
-   * Asynchronously run a list of commands sequentially for a given sprite,
-   * starting with an initial state (if not provided, initialize from the sprite)
-   */
   const runSpriteCommands = async (spriteId, commands, initState = null) => {
     let state = initState;
     if (!state) {
       const sprite = sprites.find((s) => s.id === spriteId);
       state = { ...sprite.position, rotation: sprite.rotation };
     }
-
     for (const cmd of commands) {
       if (cmd.type === "move") {
         const steps = Number(cmd.value || 10);
@@ -140,10 +192,33 @@ export default function App() {
         for (let i = 0; i < times; i++) {
           state = await runSpriteCommands(spriteId, cmd.commands || [], state);
         }
-        continue; // skip the rest for this block
+        continue;
+      } else if (cmd.type === "wait") {
+        await delay(Number(cmd.time || 1) * 1000);
+      } else if (cmd.type === "say" || cmd.type === "think") {
+        // Show the look text for 2 seconds
+        setSprites((prev) =>
+          prev.map((s) =>
+            s.id === spriteId ? { ...s, lookText: cmd.text } : s
+          )
+        );
+        await delay(2000);
+        setSprites((prev) =>
+          prev.map((s) => (s.id === spriteId ? { ...s, lookText: "" } : s))
+        );
+        continue;
+      } else if (cmd.type === "show") {
+        setSprites((prev) =>
+          prev.map((s) => (s.id === spriteId ? { ...s, isVisible: true } : s))
+        );
+        await delay(500);
+      } else if (cmd.type === "hide") {
+        setSprites((prev) =>
+          prev.map((s) => (s.id === spriteId ? { ...s, isVisible: false } : s))
+        );
+        await delay(500);
       }
-
-      // Update the sprite's state in React after each command
+      // Update sprite’s position and rotation
       setSprites((prev) =>
         prev.map((s) =>
           s.id === spriteId
@@ -155,26 +230,22 @@ export default function App() {
             : s
         )
       );
-
-      // Wait a bit before processing the next command
       await delay(500);
-
-      // Check for collisions and swap animations if any sprites collided
       checkAndSwapCollisions();
     }
-
     return state;
   };
 
   /**
-   * The "Play" function:
-   * - Runs the current sprite's commands asynchronously.
-   * - This can be extended to run all sprites if desired.
+   * Play the current sprite’s script
    */
   const play = async () => {
+    setIsPlaying(true);
     const currentSprite = sprites.find((s) => s.id === currentSpriteId);
-    if (!currentSprite) return;
-
+    if (!currentSprite) {
+      setIsPlaying(false);
+      return;
+    }
     const initialState = {
       ...currentSprite.position,
       rotation: currentSprite.rotation,
@@ -184,10 +255,11 @@ export default function App() {
       currentSprite.script,
       initialState
     );
+    setIsPlaying(false);
   };
 
   /**
-   * Update the script for the currently selected sprite
+   * Update the current sprite’s script
    */
   const updateCurrentSpriteScript = (newScript) => {
     setSprites((prev) =>
@@ -198,23 +270,18 @@ export default function App() {
   };
 
   /**
-   * Move a block between containers (palette <-> script)
+   * Move a block between palette and script
    */
   const moveBlock = (block, target) => {
     if (block.source === target) return;
-
     const currentSprite = sprites.find((s) => s.id === currentSpriteId);
     if (!currentSprite) return;
-
-    // From palette to script
     if (block.source === "palette" && target === "script") {
       updateCurrentSpriteScript([
         ...currentSprite.script,
         { ...block, source: "script", id: Date.now() },
       ]);
-    }
-    // From script back to palette
-    else if (block.source === "script" && target === "palette") {
+    } else if (block.source === "script" && target === "palette") {
       updateCurrentSpriteScript(
         currentSprite.script.filter((b) => b.id !== block.id)
       );
@@ -222,7 +289,7 @@ export default function App() {
   };
 
   /**
-   * Clears the drag states
+   * Clear drag states
    */
   const clearDrag = () => {
     setPotentialDrag(null);
@@ -242,17 +309,17 @@ export default function App() {
         script: [],
         position: { x: 50, y: 50 },
         rotation: 0,
+        isVisible: true, // New sprites are visible by default
       },
     ]);
     setCurrentSpriteId(newId);
   };
 
   /**
-   * Remove an existing sprite by id
+   * Remove an existing sprite
    */
   const removeSprite = (id) => {
     setSprites((prev) => prev.filter((s) => s.id !== id));
-    // If we removed the current sprite, pick another or reset
     if (id === currentSpriteId) {
       const newSprites = sprites.filter((s) => s.id !== id);
       if (newSprites.length > 0) {
@@ -264,11 +331,13 @@ export default function App() {
   };
 
   /**
-   * Update a palette block's properties (e.g. move steps, turn degrees, etc.)
+   * Update a palette block’s properties.
+   * Note: We update the palette for the current category.
    */
   function handlePaletteChange(blockId, field, value) {
-    setPalette((prev) =>
-      prev.map((b) =>
+    setPalettes((prev) => ({
+      ...prev,
+      [currentPalette]: prev[currentPalette].map((b) =>
         b.id === blockId
           ? {
               ...b,
@@ -276,14 +345,14 @@ export default function App() {
               label: generateLabel({ ...b, [field]: value }),
             }
           : b
-      )
-    );
+      ),
+    }));
   }
 
   /**
-   * Update a script block's properties for the current sprite
+   * Update a script block’s properties for the current sprite.
    */
-  function updateScriptBlock(blockId, field, value) {
+  const updateScriptBlock = (blockId, field, value) => {
     setSprites((prevSprites) =>
       prevSprites.map((sprite) =>
         sprite.id === currentSpriteId
@@ -302,10 +371,10 @@ export default function App() {
           : sprite
       )
     );
-  }
+  };
 
   /**
-   * When a sprite is dragged on the Stage, update its position
+   * Update a sprite’s position when dragged on the Stage.
    */
   const updateSpritePosition = (spriteId, newPosition) => {
     setSprites((prev) =>
@@ -315,7 +384,6 @@ export default function App() {
     );
   };
 
-  // Identify the current sprite object (if any)
   const currentSprite = sprites.find((s) => s.id === currentSpriteId);
 
   return (
@@ -324,7 +392,6 @@ export default function App() {
       onMouseMove={handleMouseMove}
       onMouseUp={handleGlobalMouseUp}
     >
-      {/* Top bar with only the "Play" button */}
       <div className="flex items-center justify-end px-4 py-2 border-b border-gray-300">
         <button
           onClick={play}
@@ -333,22 +400,19 @@ export default function App() {
           Play
         </button>
       </div>
-
-      {/* Main area: 3 columns filling remaining space */}
       <div className="flex-1 flex flex-row h-full">
-        {/* 1) Left column: Palette */}
         <Sidebar
           containerName="palette"
-          blocks={palette}
-          setPalette={setPalette}
+          blocks={palettes[currentPalette]}
+          setPalette={setPalettes}
           onStartDrag={startPotentialDrag}
           moveBlock={moveBlock}
           draggedBlock={draggedBlock}
           clearDrag={clearDrag}
           handleChange={handlePaletteChange}
+          currentPalette={currentPalette}
+          setCurrentPalette={setCurrentPalette}
         />
-
-        {/* 2) Center column: Script Editor */}
         <MidArea
           containerName="script"
           blocks={currentSprite?.script || []}
@@ -363,15 +427,12 @@ export default function App() {
           addSprite={addSprite}
           removeSprite={removeSprite}
         />
-
-        {/* 3) Right column: Stage */}
         <PreviewArea
           sprites={sprites}
           updateSpritePosition={updateSpritePosition}
+          isPlaying={isPlaying}
         />
       </div>
-
-      {/* Drag preview */}
       {draggedBlock && (
         <div
           className="pointer-events-none fixed z-50 px-2 py-1 rounded text-white text-sm bg-blue-600"
